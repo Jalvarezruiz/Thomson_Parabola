@@ -1,0 +1,222 @@
+//MACRO FOR IMAGEJ TO EXTRACT THE SPECTRAL ENERGY DISTRIBUTION OF IONS
+//FROM  THE IMAGE PLATES OF A THOMSON PARABOLA
+
+//Parameters of Image Plate and Scanner for ions
+Res=25;
+Scan=4000;
+L=5;
+G=65535;
+
+//Parameters of Thomson Parabola
+B=0.5; //Magnetic Field (T)
+l=0.05; //Radious of Magnet (m)
+d=0.245; //Length of Thomson Parabola (m)
+
+// Physical Constants
+e_charge=1.67E-19;
+amu=1.67E-27;
+
+//Other variables
+leftButton=16;
+
+//Clean Log
+print("\\Clear");
+
+Dialog.create("Thomson Parabola Analyzer Tool");
+	Dialog.addMessage("This macro asigns energies and intensities in PSL\n");
+	Dialog.addMessage("to the ion signals collected by the Thomson Parabola.\n");
+	Dialog.addMessage("The software will ask you to:\n");
+	Dialog.addMessage("1 - Open the *.inf file of the image.\n");
+	Dialog.addMessage("2 - Ask for Tilting correction of the image.\n");
+	Dialog.addMessage("3 - Ask for the ion to be analyzed.\n");
+	Dialog.addMessage("4 - Select the origin of Ion Profile and a few points to trace the parabola of interest.\n");
+	Dialog.addMessage("5 - Select an area to evaluate background.\n");
+	Dialog.addMessage("Then, it will calculate and assign energies to each pixel.");
+	Dialog.addMessage("Finally, it will store the pixel value in PSL for each bin of energy and plot it.");
+Dialog.show();
+
+//1 - Open file
+pathfile=File.openDialog("Choose the file to Open:");
+file_name=File.directory+File.nameWithoutExtension;
+imagen_file=file_name+".img";
+filestring=File.openAsString(pathfile);
+rows=split(filestring, "\n"); 
+widt=parseInt(rows[6]);
+heigh=parseInt(rows[7]);
+run("Raw...", "open=[imagen_file] image=[16-bit Unsigned] width=widt height=heigh offset=0 number=1 gap=0");
+
+//2 - Tilting correction
+angle=0;
+if (getBoolean("Do you want to do tilting correction of the image?"))
+{
+	setTool("angle");
+	Lt=newArray(3);
+	xt=newArray(3);
+	yt=newArray(3);
+	Dialog.create("Tilting correction");
+		Dialog.addMessage("Please, define the angle to be corrected\n");
+    Dialog.show();
+	for(i=0;i<3;i++)
+	{
+		flag=-1;
+		while (flag!=leftButton)
+		{
+			getCursorLoc(xt[i], yt[i], z, flag);
+		}
+		wait(300);
+	}
+	//Cosine law of a triangle
+	Lt[0]=sqrt(pow(xt[0]-xt[1],2)+pow(yt[0]-yt[1],2));
+	Lt[1]=sqrt(pow(xt[2]-xt[1],2)+pow(yt[2]-yt[1],2));
+	Lt[2]=sqrt(pow(xt[2]-xt[0],2)+pow(yt[2]-yt[0],2));
+	angle=acos((pow(Lt[0],2)+pow(Lt[1],2)-pow(Lt[2],2))/(2*Lt[0]*Lt[1]));
+	print("*Tilting correction is "+angle+" radians or "+angle*180/3.14);
+}	
+else
+{
+	print("*Tilting Correction Not Selected");
+}
+
+//3 - Selection of ion to be investigated
+masa=getNumber("Mass of the ion in a.u. (1 by default) ", 1);
+carga=getNumber("Charge of the ion (1 by default) ", 1);
+print("*Ion Mass "+masa+"; Ion Charge "+carga);
+
+//4 - Select Parabola to be investigated
+Dialog.create("Thomson Parabola - Step 4");
+	Dialog.addMessage("Select 4 Points of parabola, from Origin to furthest point.");
+Dialog.show();
+print("*Parabola points selected");
+setTool("hand");
+xp=newArray(4);
+yp=newArray(4);
+for(i=0;i<4;i++)
+{
+flag=-1;
+while (flag!=leftButton)
+{
+    getCursorLoc(xi, yi, zi, flag);
+}
+wait(500);
+xp[i]=xi;
+yp[i]=yi;
+print("* "+xp[i]+" "+yp[i]);
+}
+
+makeSelection("point",xp,yp);
+ Fit.doFit("y = a*pow(x,2)+b*x+c", xp, yp);
+  Fit.plot;
+a=Fit.p(0);
+b=Fit.p(1);
+c=Fit.p(2);
+print("*Parabola Fitting parameters a*x^2+b*x+c");
+print ("* a="+a+";b="+b+";c="+c);
+
+//5 - Selection of region for background calculation
+Dialog.create("Thomson Parabola - Step 5");
+	Dialog.addMessage("Select Rectangle for Background Calculation");
+Dialog.show();
+setTool("rectangle");
+flag=-1;
+while (flag!=leftButton)
+{
+    getCursorLoc(xi, yi, zi, flag);
+}
+while (flag==leftButton)
+{
+    getCursorLoc(xf, yf, zf, flag);
+}
+getStatistics(area,mean,min,max,std,histogram);
+threshold=mean+std;
+BackgroundPSL=pow(Res/100,2)*(4000/Scan)*pow(10,L*(mean/G-1/2));
+print("*The Area selected is "+area+". Point1["+xi+","+yi+"]-Point2["+xf+","+yf+"]");
+print("*Threshold value [mean+std] is "+threshold);
+print("*Background value in PSL "+BackgroundPSL);
+
+//6 - Sweeping image
+Dialog.create("Thomson Parabola - Step 6");
+Dialog.addMessage("Thomson Parabola Parameters\n");
+print("*Thomson Parabola Parameters");
+q=e_charge*carga;
+m=amu*masa;
+Dialog.addMessage("Analyzer Length[m]="+d+"; Magnet Radius[m]="+l+"; Magnetic Field[T]="+B+"\n");
+print("*Analyzer Length[m]="+d+"; Magnet Radius[m]="+l+"; Magnetic Field[T]="+B);
+Dialog.addMessage("Asigning Energies [MeV] to the pixels\n");
+print("*Asigning Energies [MeV] to the pixels");
+Dialog.addMessage("The default values for the asignement are:\n");
+print("*The default values for the asignement are:");
+n=20;
+step=1;
+Intensity = newArray(n);
+Ebin=newArray(n);
+for(i=0;i<n;i++)
+{
+Ebin[i]=i*step;
+}
+Dialog.addMessage("from "+Ebin[0]+" MeV [minimum energy to reach detector] up to "+Ebin[n-1]+" MeV\n\n");
+print("*from "+Ebin[0]+" MeV [minimum energy to reach detector] up to "+Ebin[n-1]+" MeV\n\n");
+Dialog.show();
+
+count=0;
+Total=0;
+print("*Identified Pixels");
+print("Xvalue Yvalue Deflection Energy[MeV] Value[PSL]");
+for (j=minOf(xp[0],xp[3]);j<=maxOf(xp[0],xp[3]);j++)
+{
+	parabola=a*pow(j,2)+b*j+c;
+	for (i=parabola-10;i<parabola+10;i++)
+	{
+		valor=getPixel(j, i);
+		if (valor>threshold)
+		{
+			count++;
+			length=abs(yp[0]-i)*25E-6/cos(angle);
+			Energy=pow(q*B*l*(2*d-l),2)/(8*m*pow(length,2))/1.6E-13;
+			PSL=pow(Res/100,2)*(4000/Scan)*pow(10,L*(valor/G-1/2));
+			Total=Total+PSL;
+			for(k=1;k<n;k++)
+			{
+                        	if(Energy<Ebin[k])
+				{                       
+					Intensity[k-1]=Intensity[k-1]+PSL;
+					k=n;		
+				}
+			}
+			if (Energy>Ebin[n-1])
+			{
+				Intensity[n-1]=Intensity[n-1]+PSL;
+			}
+			print(j+" "+i+" "+length+" "+Energy+" "+PSL);
+
+		}
+	}
+}
+print("*Total number of stored pixel="+count);
+print("*Total intensity="+Total);
+selectWindow("Log"); 
+saveAs("txt", file_name+"_log.txt");
+
+//7 - Plot Results
+Array.getStatistics(Intensity, min_y, max_y, mean_y, stdDev_y);
+Plot.create("Tomson Parabola Plot", "X", "Y");
+Plot.setLimits(Ebin[0],Ebin[n-1], min_y, max_y);
+Plot.add("circles", Ebin, Intensity);
+Plot.show();
+//and save them
+run("Clear Results"); 
+  for(i=0; i< Ebin.length; i++) { 
+     setResult("Energy",i,Ebin[i]);
+     setResult("Intensity_PSL",i,Intensity[i]); 
+} 
+ setOption("ShowRowNumbers", false); 
+ updateResults; 
+saveAs("Results", file_name+"_results.txt"); 
+
+Dialog.create("Thomson Parabola Tool ");
+	Dialog.addMessage("The analysis has finished.\n");
+	Dialog.addMessage("Both the log file and the Results have been saved\n");
+	Dialog.addMessage("Have a nice day!\n");
+	Dialog.addMessage("Thomson Parabola Analyzer v1.1\n");
+	Dialog.addMessage("Licence GPL - http://www.gnu.org/licenses/licenses.en.html \n");
+	Dialog.addMessage("2013 Javier Fernandez javier.fernandez-tobias@stfc.ac.uk \n Jesus Alvarez jalvarezruiz@gmail.com");   
+Dialog.show();
