@@ -7,7 +7,7 @@ The software will ask you to:
 	2 - Ask for Tilting correction of the image.
 	3 - Ask for the ion to be analyzed.
 	4 - Select the origin of Ion Profile and a few points to trace the parabola of interest.
-	5 - Select an area to evaluate background.
+	5 - Indicate the pixel width of the Zero point
 	Then, it will calculate and assign energies to each pixel.
 	Finally, it will store the pixel value in PSL for each bin of energy and plot it.
 	
