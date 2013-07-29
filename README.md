@@ -7,11 +7,12 @@ The software will ask you to:
 	2 - Ask for Tilting correction of the image.
 	3 - Ask for the ion to be analyzed.
 	4 - Select the origin of Ion Profile and a few points to trace the parabola of interest.
-	5 - Indicate the pixel width of the Zero point
+	5 - Indicate the pixel width of the Zero point.
 	Then, it will calculate and assign energies to each pixel.
 	Finally, it will store the pixel value in PSL for each bin of energy and plot it.
 	
 To use it, just copy the file in the plugin directory of ImageJ and restart ImageJ.
+NOTE: The sript needs to be edited in order to include the corresponding Thomson Parabola B field and geometries.
 To run it, go to the Plugins menu. It should appear at the bottom.
 
 Any comment/improvement about the code will be welcome!
