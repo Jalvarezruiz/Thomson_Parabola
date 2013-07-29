@@ -18,8 +18,8 @@ To run it, go to the Plugins menu. It should appear at the bottom.
 Any comment/improvement about the code will be welcome!
 
 Latest version:
-June 26th, 2013
-Thomson_Parabola_v1_1.txt
+July 29th, 2013
+Thomson_Parabola_v2_0.txt
 
 Licence GPL - http://www.gnu.org/licenses/licenses.en.html
 Javier Fernandez javier.fernandez-tobias@stfc.ac.uk 
